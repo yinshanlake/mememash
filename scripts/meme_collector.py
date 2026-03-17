@@ -260,7 +260,7 @@ def main():
     parser.add_argument("--path", help="Local folder path (for --source folder)")
     parser.add_argument(
         "--api-url",
-        default="https://mememash-app.azurestaticapps.net",
+        default="https://jolly-wave-008563700.4.azurestaticapps.net",
         help="MemeMash API URL",
     )
 
