@@ -3,6 +3,7 @@ import uuid
 import random
 import math
 import os
+from datetime import datetime, timezone
 from flask import Flask, request, jsonify, send_from_directory
 from azure.data.tables import TableServiceClient
 from azure.storage.blob import BlobServiceClient, ContentSettings
@@ -10,6 +11,7 @@ from azure.storage.blob import BlobServiceClient, ContentSettings
 app = Flask(__name__, static_folder="src", static_url_path="")
 
 K_FACTOR = 32
+MAX_MEMES = 50  # Auto-rotate when exceeding this count
 
 
 def get_connection_string():
@@ -29,6 +31,7 @@ def get_blob_container():
 
 
 def meme_entity_to_dict(entity):
+    created = entity.get("CreatedAt", "")
     return {
         "id": entity["RowKey"],
         "name": entity.get("Name", ""),
@@ -36,6 +39,7 @@ def meme_entity_to_dict(entity):
         "elo": entity.get("Elo", 1200),
         "wins": entity.get("Wins", 0),
         "losses": entity.get("Losses", 0),
+        "createdAt": created if isinstance(created, str) else created.isoformat() if created else "",
     }
 
 
@@ -95,8 +99,12 @@ def upload_meme():
         "Elo": 1200,
         "Wins": 0,
         "Losses": 0,
+        "CreatedAt": datetime.now(timezone.utc).isoformat(),
     }
     table.create_entity(entity)
+
+    # Auto-rotate: if we exceed MAX_MEMES, delete the oldest
+    _auto_rotate(table)
 
     return jsonify(meme_entity_to_dict(entity)), 201
 
@@ -108,23 +116,14 @@ def delete_meme(meme_id):
 
     try:
         entity = table.get_entity("meme", meme_id)
-        image_url = entity.get("ImageUrl", "")
-        blob_name = image_url.rsplit("/", 1)[-1] if image_url else None
     except Exception:
         return jsonify({"error": "Meme not found"}), 404
 
-    if blob_name:
-        try:
-            container = get_blob_container()
-            container.delete_blob(blob_name)
-        except Exception:
-            pass
-
-    table.delete_entity("meme", meme_id)
+    _delete_meme_by_entity(table, entity)
     return jsonify({"deleted": meme_id})
 
 
-# GET /api/pair
+# GET /api/pair?winnerId=xxx
 @app.route("/api/pair", methods=["GET"])
 def get_pair():
     table = get_table_client()
@@ -133,6 +132,23 @@ def get_pair():
     if len(all_memes) < 2:
         return jsonify({"error": "Need at least 2 memes"}), 400
 
+    winner_id = request.args.get("winnerId")
+
+    if winner_id:
+        # Winner stays — find a new challenger
+        winner = next((m for m in all_memes if m["id"] == winner_id), None)
+        if not winner:
+            winner_id = None  # winner was deleted, fall through to random pair
+
+    if winner_id and winner:
+        others = [m for m in all_memes if m["id"] != winner_id]
+        # Prefer memes with fewer battles as challenger
+        others.sort(key=lambda m: m["wins"] + m["losses"])
+        pool_size = min(len(others), max(3, len(others) // 2))
+        challenger = others[random.randint(0, pool_size - 1)]
+        return jsonify({"left": winner, "right": challenger, "keepLeft": True})
+
+    # No winner — pick a fresh random pair
     all_memes.sort(key=lambda m: m["wins"] + m["losses"])
     pool_size = min(len(all_memes), max(4, len(all_memes) // 2))
     i = random.randint(0, pool_size - 1)
@@ -141,7 +157,7 @@ def get_pair():
     remaining = [m for m in all_memes if m["id"] != meme_a["id"]]
     meme_b = random.choice(remaining)
 
-    return jsonify({"left": meme_a, "right": meme_b})
+    return jsonify({"left": meme_a, "right": meme_b, "keepLeft": False})
 
 
 # POST /api/vote
@@ -182,4 +198,55 @@ def submit_vote():
     return jsonify({
         "winner": meme_entity_to_dict(winner),
         "loser": meme_entity_to_dict(loser),
+    })
+
+
+def _delete_meme_by_entity(table, entity):
+    """Delete a meme's blob and table entity."""
+    image_url = entity.get("ImageUrl", "")
+    blob_name = image_url.rsplit("/", 1)[-1] if image_url else None
+    if blob_name:
+        try:
+            container = get_blob_container()
+            container.delete_blob(blob_name)
+        except Exception:
+            pass
+    table.delete_entity(entity["PartitionKey"], entity["RowKey"])
+
+
+def _auto_rotate(table):
+    """If meme count exceeds MAX_MEMES, delete the oldest ones."""
+    entities = list(table.list_entities())
+    if len(entities) <= MAX_MEMES:
+        return
+
+    # Sort by CreatedAt ascending (oldest first), fallback to empty string
+    entities.sort(key=lambda e: e.get("CreatedAt", "") or "")
+    to_delete = entities[: len(entities) - MAX_MEMES]
+    for entity in to_delete:
+        _delete_meme_by_entity(table, entity)
+
+
+# POST /api/rotate - Admin: force rotation (delete oldest N, keep total at MAX_MEMES)
+@app.route("/api/rotate", methods=["POST"])
+def rotate_memes():
+    table = get_table_client()
+    entities = list(table.list_entities())
+
+    body = request.get_json() or {}
+    target = body.get("maxCount", MAX_MEMES)
+
+    if len(entities) <= target:
+        return jsonify({"message": "No rotation needed", "count": len(entities)})
+
+    entities.sort(key=lambda e: e.get("CreatedAt", "") or "")
+    to_delete = entities[: len(entities) - target]
+    deleted_ids = []
+    for entity in to_delete:
+        _delete_meme_by_entity(table, entity)
+        deleted_ids.append(entity["RowKey"])
+
+    return jsonify({
+        "deleted": deleted_ids,
+        "remaining": len(entities) - len(deleted_ids),
     })

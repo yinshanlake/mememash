@@ -519,14 +519,15 @@ async function setupBattle() {
   await nextRound();
 }
 
-async function nextRound() {
+async function nextRound(winnerId) {
   if (memes.length < 2) return;
   voting = false;
   roundNum++;
 
   try {
-    currentPair = await api('/pair');
-    renderBattle();
+    const url = winnerId ? '/pair?winnerId=' + winnerId : '/pair';
+    currentPair = await api(url);
+    renderBattle(currentPair.keepLeft);
   } catch (e) {
     console.error('Failed to get pair:', e);
   }
@@ -538,19 +539,23 @@ function esc(s) {
   return d.innerHTML;
 }
 
-function renderBattle() {
+function renderBattle(keepLeft) {
   const area = document.getElementById('battle-area');
   const a = currentPair.left;
   const b = currentPair.right;
 
+  // If winner stays on left, only animate the right card
+  const leftAnim = keepLeft ? '' : ' slide-in';
+  const rightAnim = ' slide-in';
+
   area.innerHTML =
-    '<div class="meme-card slide-in" id="card-left" onclick="vote(\'left\')">' +
+    '<div class="meme-card' + leftAnim + '" id="card-left" onclick="vote(\'left\')">' +
       '<div class="result-overlay" id="result-left"></div>' +
       '<div class="meme-img-wrap"><img src="' + esc(a.imageUrl) + '" alt="meme"></div>' +
       '<div class="meme-info"><div class="meme-title">' + esc(a.name) + '</div><div class="meme-elo">' + a.elo + ' ELO</div></div>' +
     '</div>' +
     '<div class="vs">VS</div>' +
-    '<div class="meme-card slide-in" id="card-right" onclick="vote(\'right\')" style="animation-delay:0.1s">' +
+    '<div class="meme-card' + rightAnim + '" id="card-right" onclick="vote(\'right\')">' +
       '<div class="result-overlay" id="result-right"></div>' +
       '<div class="meme-img-wrap"><img src="' + esc(b.imageUrl) + '" alt="meme"></div>' +
       '<div class="meme-info"><div class="meme-title">' + esc(b.name) + '</div><div class="meme-elo">' + b.elo + ' ELO</div></div>' +
@@ -605,7 +610,9 @@ async function vote(side) {
     console.error('Vote failed:', e);
   }
 
-  setTimeout(() => nextRound(), 800);
+  // Winner stays, loser gets replaced
+  const winnerId = winner.id;
+  setTimeout(() => nextRound(winnerId), 800);
 }
 
 document.addEventListener('keydown', (e) => {
