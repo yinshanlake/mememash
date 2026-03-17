@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MemeMash - Which meme is better?</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -256,82 +257,6 @@
     text-align: right;
   }
 
-  /* Upload view */
-  .upload-container {
-    max-width: 600px;
-    margin: 0 auto;
-    padding: 16px 24px 40px;
-  }
-
-  .drop-zone {
-    border: 2px dashed #333;
-    border-radius: 16px;
-    padding: 60px 24px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s;
-    margin-bottom: 20px;
-  }
-
-  .drop-zone:hover, .drop-zone.dragover {
-    border-color: #ff6b6b;
-    background: rgba(255, 107, 107, 0.05);
-  }
-
-  .drop-zone-icon { font-size: 48px; margin-bottom: 12px; }
-
-  .drop-zone-text { color: #888; font-size: 15px; }
-  .drop-zone-text strong { color: #ff6b6b; }
-
-  .meme-gallery {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 8px;
-    margin-top: 16px;
-  }
-
-  .gallery-item {
-    position: relative;
-    aspect-ratio: 1;
-    border-radius: 8px;
-    overflow: hidden;
-    border: 1px solid #222;
-  }
-
-  .gallery-item img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .gallery-item .del-btn {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 24px;
-    height: 24px;
-    background: rgba(0,0,0,0.7);
-    border: none;
-    color: #ff4444;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 14px;
-    display: none;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .gallery-item:hover .del-btn { display: flex; }
-
-  .section-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: #999;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #222;
-  }
-
   .empty-state {
     text-align: center;
     padding: 60px 24px;
@@ -394,17 +319,12 @@
 
   .stats-bar span strong { color: #aaa; }
 
-  .upload-progress {
-    margin-top: 8px;
+  .win-streak {
     text-align: center;
-    color: #888;
+    padding: 4px 16px;
     font-size: 13px;
-  }
-
-  .loading-spinner {
-    text-align: center;
-    padding: 40px;
-    color: #666;
+    color: #4caf50;
+    font-weight: 600;
   }
 </style>
 </head>
@@ -418,22 +338,22 @@
 <nav class="nav">
   <button class="active" onclick="showView('battle')" id="nav-battle">Battle</button>
   <button onclick="showView('rankings')" id="nav-rankings">Rankings</button>
-  <button onclick="showView('upload')" id="nav-upload">Upload</button>
 </nav>
 
 <div class="stats-bar">
   <span><strong id="stat-memes">0</strong> memes</span>
-  <span><strong id="stat-votes">0</strong> votes</span>
-  <span><strong id="stat-rounds">0</strong> rounds</span>
+  <span><strong id="stat-votes">0</strong> total votes</span>
+  <span><strong id="stat-users">0</strong> players</span>
 </div>
 
 <!-- Battle View -->
 <div id="view-battle">
   <div class="question">Who's the better meme?</div>
+  <div class="win-streak hidden" id="win-streak"></div>
   <div class="battle-container" id="battle-area">
     <div class="empty-state" id="battle-empty">
       <div style="font-size:48px;margin-bottom:8px">&#x1F5BC;</div>
-      <p>Upload at least 2 memes to start battling!</p>
+      <p>Loading memes...</p>
     </div>
   </div>
   <div id="battle-controls" class="hidden">
@@ -450,31 +370,16 @@
   <div class="rankings-container" id="rankings-list"></div>
 </div>
 
-<!-- Upload View -->
-<div id="view-upload" class="hidden">
-  <div class="upload-container">
-    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
-      <div class="drop-zone-icon">&#x1F4C1;</div>
-      <div class="drop-zone-text">
-        <strong>Click to upload</strong> or drag &amp; drop<br>
-        <span style="font-size:12px;color:#666">PNG, JPG, GIF, WebP</span>
-      </div>
-    </div>
-    <input type="file" id="file-input" accept="image/*" multiple style="display:none" onchange="handleFiles(this.files)">
-    <div class="upload-progress hidden" id="upload-progress"></div>
-
-    <div class="section-title">Uploaded memes (<span id="upload-count">0</span>)</div>
-    <div class="meme-gallery" id="meme-gallery"></div>
-  </div>
-</div>
-
 <script>
 const API = '/api';
 let memes = [];
 let totalVotes = 0;
+let totalUsers = 0;
 let roundNum = 0;
 let currentPair = null;
 let voting = false;
+let winStreak = 0;
+let lastWinnerId = null;
 
 async function api(path, options = {}) {
   const res = await fetch(API + path, options);
@@ -488,21 +393,30 @@ async function api(path, options = {}) {
 async function loadMemes() {
   try {
     memes = await api('/memes');
-    totalVotes = memes.reduce((sum, m) => sum + m.wins + m.losses, 0) / 2;
     updateStats();
   } catch (e) {
     console.error('Failed to load memes:', e);
   }
 }
 
+async function loadStats() {
+  try {
+    const stats = await api('/stats');
+    totalVotes = stats.totalVotes || 0;
+    totalUsers = stats.uniqueUsers || 0;
+    updateStats();
+  } catch (e) {
+    console.error('Failed to load stats:', e);
+  }
+}
+
 function showView(name) {
-  ['battle', 'rankings', 'upload'].forEach(v => {
+  ['battle', 'rankings'].forEach(v => {
     document.getElementById('view-' + v).classList.toggle('hidden', v !== name);
     document.getElementById('nav-' + v).classList.toggle('active', v === name);
   });
   if (name === 'battle') setupBattle();
   if (name === 'rankings') renderRankings();
-  if (name === 'upload') renderGallery();
 }
 
 async function setupBattle() {
@@ -524,6 +438,25 @@ async function nextRound(winnerId) {
   voting = false;
   roundNum++;
 
+  // Track win streak
+  if (winnerId && winnerId === lastWinnerId) {
+    winStreak++;
+  } else if (winnerId) {
+    winStreak = 1;
+    lastWinnerId = winnerId;
+  } else {
+    winStreak = 0;
+    lastWinnerId = null;
+  }
+
+  const streakEl = document.getElementById('win-streak');
+  if (winStreak >= 2) {
+    streakEl.textContent = winStreak + ' win streak!';
+    streakEl.classList.remove('hidden');
+  } else {
+    streakEl.classList.add('hidden');
+  }
+
   try {
     const url = winnerId ? '/pair?winnerId=' + winnerId : '/pair';
     currentPair = await api(url);
@@ -544,7 +477,6 @@ function renderBattle(keepLeft) {
   const a = currentPair.left;
   const b = currentPair.right;
 
-  // If winner stays on left, only animate the right card
   const leftAnim = keepLeft ? '' : ' slide-in';
   const rightAnim = ' slide-in';
 
@@ -599,18 +531,17 @@ async function vote(side) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ winnerId: winner.id, loserId: loser.id }),
     });
-    // Update local meme data with new ELO
     const wi = memes.findIndex(m => m.id === winner.id);
     const li = memes.findIndex(m => m.id === loser.id);
     if (wi !== -1) memes[wi] = result.winner;
     if (li !== -1) memes[li] = result.loser;
-    totalVotes++;
+    totalVotes = result.totalVotes || totalVotes + 1;
+    totalUsers = result.uniqueUsers || totalUsers;
     updateStats();
   } catch (e) {
     console.error('Vote failed:', e);
   }
 
-  // Winner stays, loser gets replaced
   const winnerId = winner.id;
   setTimeout(() => nextRound(winnerId), 800);
 }
@@ -625,7 +556,7 @@ document.addEventListener('keydown', (e) => {
 function renderRankings() {
   const container = document.getElementById('rankings-list');
   if (memes.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div style="font-size:48px">&#x1F3C6;</div><p>No memes yet. Upload some first!</p></div>';
+    container.innerHTML = '<div class="empty-state"><div style="font-size:48px">&#x1F3C6;</div><p>No memes yet!</p></div>';
     return;
   }
 
@@ -649,91 +580,14 @@ function renderRankings() {
   container.innerHTML = html;
 }
 
-// Upload
-const dropZone = document.getElementById('drop-zone');
-
-dropZone.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  dropZone.classList.add('dragover');
-});
-
-dropZone.addEventListener('dragleave', () => {
-  dropZone.classList.remove('dragover');
-});
-
-dropZone.addEventListener('drop', (e) => {
-  e.preventDefault();
-  dropZone.classList.remove('dragover');
-  handleFiles(e.dataTransfer.files);
-});
-
-async function handleFiles(files) {
-  const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
-  if (imageFiles.length === 0) return;
-
-  const progress = document.getElementById('upload-progress');
-  progress.classList.remove('hidden');
-
-  for (let i = 0; i < imageFiles.length; i++) {
-    const file = imageFiles[i];
-    progress.textContent = `Uploading ${i + 1}/${imageFiles.length}: ${file.name}...`;
-
-    const formData = new FormData();
-    formData.append('image', file);
-    formData.append('name', file.name);
-
-    try {
-      const meme = await api('/memes', { method: 'POST', body: formData });
-      memes.push(meme);
-    } catch (e) {
-      console.error('Upload failed for', file.name, e);
-    }
-  }
-
-  progress.classList.add('hidden');
-  renderGallery();
-  updateStats();
-  // Reset file input
-  document.getElementById('file-input').value = '';
-}
-
-async function deleteMeme(id) {
-  try {
-    await api('/memes/' + id, { method: 'DELETE' });
-    memes = memes.filter(m => m.id !== id);
-    renderGallery();
-    updateStats();
-  } catch (e) {
-    console.error('Delete failed:', e);
-  }
-}
-
-function renderGallery() {
-  document.getElementById('upload-count').textContent = memes.length;
-  const gallery = document.getElementById('meme-gallery');
-  if (memes.length === 0) {
-    gallery.innerHTML = '<div class="empty-state" style="grid-column:1/-1;padding:20px"><p style="color:#555">No memes uploaded yet</p></div>';
-    return;
-  }
-  let html = '';
-  memes.forEach(m => {
-    html +=
-      '<div class="gallery-item">' +
-        '<img src="' + esc(m.imageUrl) + '" alt="meme">' +
-        '<button class="del-btn" onclick="deleteMeme(\'' + m.id + '\')" title="Remove">&times;</button>' +
-      '</div>';
-  });
-  gallery.innerHTML = html;
-}
-
 function updateStats() {
   document.getElementById('stat-memes').textContent = memes.length;
-  document.getElementById('stat-votes').textContent = Math.floor(totalVotes);
-  document.getElementById('stat-rounds').textContent = roundNum;
+  document.getElementById('stat-votes').textContent = totalVotes;
+  document.getElementById('stat-users').textContent = totalUsers;
 }
 
 // Init
-loadMemes().then(() => showView('battle'));
+Promise.all([loadMemes(), loadStats()]).then(() => showView('battle'));
 </script>
 </body>
 </html>
