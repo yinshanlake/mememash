@@ -11,7 +11,7 @@ from azure.storage.blob import BlobServiceClient, ContentSettings
 app = Flask(__name__, static_folder="src", static_url_path="")
 
 K_FACTOR = 32
-MAX_MEMES = 50  # Auto-rotate when exceeding this count
+MAX_MEMES = 500  # Auto-rotate when exceeding this count
 
 
 def get_connection_string():
