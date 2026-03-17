@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MemeMash - Which meme is better?</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0a0a0a;
+    color: #fff;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  header {
+    text-align: center;
+    padding: 24px 16px 8px;
+  }
+
+  header h1 {
+    font-size: 42px;
+    font-weight: 900;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #ff6b6b, #ffa500, #ff6b6b);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 3s ease infinite;
+  }
+
+  @keyframes shimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  header p {
+    color: #888;
+    font-size: 14px;
+    margin-top: 4px;
+  }
+
+  .nav {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .nav button {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #ccc;
+    padding: 8px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+  }
+
+  .nav button:hover, .nav button.active {
+    background: #2a2a2a;
+    border-color: #ff6b6b;
+    color: #fff;
+  }
+
+  /* Battle view */
+  .battle-container {
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    gap: 24px;
+    padding: 20px 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .question {
+    text-align: center;
+    font-size: 24px;
+    font-weight: 700;
+    padding: 0 16px 8px;
+    color: #eee;
+  }
+
+  .meme-card {
+    flex: 1;
+    max-width: 520px;
+    background: #141414;
+    border: 2px solid #222;
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .meme-card:hover {
+    border-color: #ff6b6b;
+    transform: translateY(-4px);
+    box-shadow: 0 8px 30px rgba(255, 107, 107, 0.15);
+  }
+
+  .meme-card.winner {
+    border-color: #4caf50;
+    box-shadow: 0 0 40px rgba(76, 175, 80, 0.3);
+  }
+
+  .meme-card.loser {
+    opacity: 0.4;
+    transform: scale(0.97);
+  }
+
+  .meme-img-wrap {
+    width: 100%;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0d0d0d;
+    overflow: hidden;
+  }
+
+  .meme-img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .meme-info {
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .meme-title {
+    font-weight: 600;
+    font-size: 15px;
+    color: #ddd;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 70%;
+  }
+
+  .meme-elo {
+    font-size: 13px;
+    color: #888;
+    font-weight: 500;
+  }
+
+  .vs {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 900;
+    color: #444;
+    user-select: none;
+    flex-shrink: 0;
+  }
+
+  .skip-btn {
+    display: block;
+    margin: 0 auto 16px;
+    background: none;
+    border: 1px solid #333;
+    color: #666;
+    padding: 8px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+  }
+
+  .skip-btn:hover {
+    border-color: #555;
+    color: #aaa;
+  }
+
+  .round-info {
+    text-align: center;
+    color: #555;
+    font-size: 13px;
+    padding-bottom: 16px;
+  }
+
+  /* Rankings view */
+  .rankings-container {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 16px 24px 40px;
+  }
+
+  .ranking-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    background: #141414;
+    border: 1px solid #222;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    transition: all 0.2s;
+  }
+
+  .ranking-item:hover {
+    border-color: #333;
+    background: #1a1a1a;
+  }
+
+  .rank-num {
+    font-size: 20px;
+    font-weight: 800;
+    color: #555;
+    min-width: 36px;
+    text-align: center;
+  }
+
+  .rank-num.gold { color: #ffd700; }
+  .rank-num.silver { color: #c0c0c0; }
+  .rank-num.bronze { color: #cd7f32; }
+
+  .rank-thumb {
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #0d0d0d;
+  }
+
+  .rank-details { flex: 1; }
+
+  .rank-title {
+    font-weight: 600;
+    font-size: 15px;
+    color: #ddd;
+  }
+
+  .rank-stats {
+    font-size: 12px;
+    color: #666;
+    margin-top: 2px;
+  }
+
+  .rank-elo-val {
+    font-size: 18px;
+    font-weight: 700;
+    color: #ff6b6b;
+    min-width: 60px;
+    text-align: right;
+  }
+
+  /* Upload view */
+  .upload-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 16px 24px 40px;
+  }
+
+  .drop-zone {
+    border: 2px dashed #333;
+    border-radius: 16px;
+    padding: 60px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-bottom: 20px;
+  }
+
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: #ff6b6b;
+    background: rgba(255, 107, 107, 0.05);
+  }
+
+  .drop-zone-icon { font-size: 48px; margin-bottom: 12px; }
+
+  .drop-zone-text { color: #888; font-size: 15px; }
+  .drop-zone-text strong { color: #ff6b6b; }
+
+  .meme-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .gallery-item {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #222;
+  }
+
+  .gallery-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .gallery-item .del-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    background: rgba(0,0,0,0.7);
+    border: none;
+    color: #ff4444;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .gallery-item:hover .del-btn { display: flex; }
+
+  .section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #999;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #222;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 24px;
+    color: #555;
+  }
+
+  .empty-state p { margin-top: 8px; font-size: 14px; }
+
+  .hidden { display: none !important; }
+
+  .result-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    font-weight: 900;
+    z-index: 10;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .result-overlay.show { opacity: 1; }
+  .result-overlay.win { background: rgba(76, 175, 80, 0.15); color: #4caf50; }
+  .result-overlay.lose { background: rgba(255, 68, 68, 0.15); color: #ff4444; }
+
+  .keyboard-hint {
+    text-align: center;
+    color: #444;
+    font-size: 12px;
+    padding: 4px;
+  }
+
+  .keyboard-hint kbd {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: inherit;
+    font-size: 11px;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .slide-in { animation: slideIn 0.4s ease; }
+
+  .stats-bar {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    padding: 8px 16px;
+    color: #666;
+    font-size: 13px;
+  }
+
+  .stats-bar span strong { color: #aaa; }
+
+  .upload-progress {
+    margin-top: 8px;
+    text-align: center;
+    color: #888;
+    font-size: 13px;
+  }
+
+  .loading-spinner {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>MemeMash</h1>
+  <p>Who's the better meme? You decide.</p>
+</header>
+
+<nav class="nav">
+  <button class="active" onclick="showView('battle')" id="nav-battle">Battle</button>
+  <button onclick="showView('rankings')" id="nav-rankings">Rankings</button>
+  <button onclick="showView('upload')" id="nav-upload">Upload</button>
+</nav>
+
+<div class="stats-bar">
+  <span><strong id="stat-memes">0</strong> memes</span>
+  <span><strong id="stat-votes">0</strong> votes</span>
+  <span><strong id="stat-rounds">0</strong> rounds</span>
+</div>
+
+<!-- Battle View -->
+<div id="view-battle">
+  <div class="question">Who's the better meme?</div>
+  <div class="battle-container" id="battle-area">
+    <div class="empty-state" id="battle-empty">
+      <div style="font-size:48px;margin-bottom:8px">&#x1F5BC;</div>
+      <p>Upload at least 2 memes to start battling!</p>
+    </div>
+  </div>
+  <div id="battle-controls" class="hidden">
+    <div class="keyboard-hint">
+      <kbd>&larr;</kbd> left wins &nbsp;&middot;&nbsp; <kbd>&rarr;</kbd> right wins &nbsp;&middot;&nbsp; <kbd>S</kbd> skip
+    </div>
+    <button class="skip-btn" onclick="nextRound()">Skip this round</button>
+    <div class="round-info" id="round-info"></div>
+  </div>
+</div>
+
+<!-- Rankings View -->
+<div id="view-rankings" class="hidden">
+  <div class="rankings-container" id="rankings-list"></div>
+</div>
+
+<!-- Upload View -->
+<div id="view-upload" class="hidden">
+  <div class="upload-container">
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div class="drop-zone-icon">&#x1F4C1;</div>
+      <div class="drop-zone-text">
+        <strong>Click to upload</strong> or drag &amp; drop<br>
+        <span style="font-size:12px;color:#666">PNG, JPG, GIF, WebP</span>
+      </div>
+    </div>
+    <input type="file" id="file-input" accept="image/*" multiple style="display:none" onchange="handleFiles(this.files)">
+    <div class="upload-progress hidden" id="upload-progress"></div>
+
+    <div class="section-title">Uploaded memes (<span id="upload-count">0</span>)</div>
+    <div class="meme-gallery" id="meme-gallery"></div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+let memes = [];
+let totalVotes = 0;
+let roundNum = 0;
+let currentPair = null;
+let voting = false;
+
+async function api(path, options = {}) {
+  const res = await fetch(API + path, options);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Request failed');
+  }
+  return res.json();
+}
+
+async function loadMemes() {
+  try {
+    memes = await api('/memes');
+    totalVotes = memes.reduce((sum, m) => sum + m.wins + m.losses, 0) / 2;
+    updateStats();
+  } catch (e) {
+    console.error('Failed to load memes:', e);
+  }
+}
+
+function showView(name) {
+  ['battle', 'rankings', 'upload'].forEach(v => {
+    document.getElementById('view-' + v).classList.toggle('hidden', v !== name);
+    document.getElementById('nav-' + v).classList.toggle('active', v === name);
+  });
+  if (name === 'battle') setupBattle();
+  if (name === 'rankings') renderRankings();
+  if (name === 'upload') renderGallery();
+}
+
+async function setupBattle() {
+  updateStats();
+  const area = document.getElementById('battle-area');
+  if (memes.length < 2) {
+    document.getElementById('battle-empty').classList.remove('hidden');
+    document.getElementById('battle-controls').classList.add('hidden');
+    area.querySelectorAll('.meme-card, .vs').forEach(el => el.remove());
+    return;
+  }
+  document.getElementById('battle-empty').classList.add('hidden');
+  document.getElementById('battle-controls').classList.remove('hidden');
+  await nextRound();
+}
+
+async function nextRound() {
+  if (memes.length < 2) return;
+  voting = false;
+  roundNum++;
+
+  try {
+    currentPair = await api('/pair');
+    renderBattle();
+  } catch (e) {
+    console.error('Failed to get pair:', e);
+  }
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function renderBattle() {
+  const area = document.getElementById('battle-area');
+  const a = currentPair.left;
+  const b = currentPair.right;
+
+  area.innerHTML =
+    '<div class="meme-card slide-in" id="card-left" onclick="vote(\'left\')">' +
+      '<div class="result-overlay" id="result-left"></div>' +
+      '<div class="meme-img-wrap"><img src="' + esc(a.imageUrl) + '" alt="meme"></div>' +
+      '<div class="meme-info"><div class="meme-title">' + esc(a.name) + '</div><div class="meme-elo">' + a.elo + ' ELO</div></div>' +
+    '</div>' +
+    '<div class="vs">VS</div>' +
+    '<div class="meme-card slide-in" id="card-right" onclick="vote(\'right\')" style="animation-delay:0.1s">' +
+      '<div class="result-overlay" id="result-right"></div>' +
+      '<div class="meme-img-wrap"><img src="' + esc(b.imageUrl) + '" alt="meme"></div>' +
+      '<div class="meme-info"><div class="meme-title">' + esc(b.name) + '</div><div class="meme-elo">' + b.elo + ' ELO</div></div>' +
+    '</div>';
+
+  document.getElementById('round-info').textContent = 'Round #' + roundNum;
+  updateStats();
+}
+
+async function vote(side) {
+  if (voting || !currentPair) return;
+  voting = true;
+
+  const winner = side === 'left' ? currentPair.left : currentPair.right;
+  const loser = side === 'left' ? currentPair.right : currentPair.left;
+
+  const leftCard = document.getElementById('card-left');
+  const rightCard = document.getElementById('card-right');
+  const leftOverlay = document.getElementById('result-left');
+  const rightOverlay = document.getElementById('result-right');
+
+  if (side === 'left') {
+    leftCard.classList.add('winner');
+    rightCard.classList.add('loser');
+    leftOverlay.className = 'result-overlay show win';
+    leftOverlay.textContent = 'WIN';
+    rightOverlay.className = 'result-overlay show lose';
+    rightOverlay.textContent = 'LOSE';
+  } else {
+    rightCard.classList.add('winner');
+    leftCard.classList.add('loser');
+    rightOverlay.className = 'result-overlay show win';
+    rightOverlay.textContent = 'WIN';
+    leftOverlay.className = 'result-overlay show lose';
+    leftOverlay.textContent = 'LOSE';
+  }
+
+  try {
+    const result = await api('/vote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ winnerId: winner.id, loserId: loser.id }),
+    });
+    // Update local meme data with new ELO
+    const wi = memes.findIndex(m => m.id === winner.id);
+    const li = memes.findIndex(m => m.id === loser.id);
+    if (wi !== -1) memes[wi] = result.winner;
+    if (li !== -1) memes[li] = result.loser;
+    totalVotes++;
+    updateStats();
+  } catch (e) {
+    console.error('Vote failed:', e);
+  }
+
+  setTimeout(() => nextRound(), 800);
+}
+
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('view-battle').classList.contains('hidden')) return;
+  if (e.key === 'ArrowLeft') vote('left');
+  else if (e.key === 'ArrowRight') vote('right');
+  else if (e.key === 's' || e.key === 'S') nextRound();
+});
+
+function renderRankings() {
+  const container = document.getElementById('rankings-list');
+  if (memes.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div style="font-size:48px">&#x1F3C6;</div><p>No memes yet. Upload some first!</p></div>';
+    return;
+  }
+
+  const sorted = [...memes].sort((a, b) => b.elo - a.elo);
+  let html = '';
+  sorted.forEach((m, i) => {
+    const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+    const total = m.wins + m.losses;
+    const winRate = total > 0 ? Math.round((m.wins / total) * 100) : 0;
+    html +=
+      '<div class="ranking-item slide-in" style="animation-delay:' + (i * 0.05) + 's">' +
+        '<div class="rank-num ' + rankClass + '">#' + (i + 1) + '</div>' +
+        '<img class="rank-thumb" src="' + esc(m.imageUrl) + '" alt="meme">' +
+        '<div class="rank-details">' +
+          '<div class="rank-title">' + esc(m.name) + '</div>' +
+          '<div class="rank-stats">' + m.wins + 'W - ' + m.losses + 'L &middot; ' + winRate + '% win rate &middot; ' + total + ' battles</div>' +
+        '</div>' +
+        '<div class="rank-elo-val">' + m.elo + '</div>' +
+      '</div>';
+  });
+  container.innerHTML = html;
+}
+
+// Upload
+const dropZone = document.getElementById('drop-zone');
+
+dropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  dropZone.classList.add('dragover');
+});
+
+dropZone.addEventListener('dragleave', () => {
+  dropZone.classList.remove('dragover');
+});
+
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+
+async function handleFiles(files) {
+  const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+  if (imageFiles.length === 0) return;
+
+  const progress = document.getElementById('upload-progress');
+  progress.classList.remove('hidden');
+
+  for (let i = 0; i < imageFiles.length; i++) {
+    const file = imageFiles[i];
+    progress.textContent = `Uploading ${i + 1}/${imageFiles.length}: ${file.name}...`;
+
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('name', file.name);
+
+    try {
+      const meme = await api('/memes', { method: 'POST', body: formData });
+      memes.push(meme);
+    } catch (e) {
+      console.error('Upload failed for', file.name, e);
+    }
+  }
+
+  progress.classList.add('hidden');
+  renderGallery();
+  updateStats();
+  // Reset file input
+  document.getElementById('file-input').value = '';
+}
+
+async function deleteMeme(id) {
+  try {
+    await api('/memes/' + id, { method: 'DELETE' });
+    memes = memes.filter(m => m.id !== id);
+    renderGallery();
+    updateStats();
+  } catch (e) {
+    console.error('Delete failed:', e);
+  }
+}
+
+function renderGallery() {
+  document.getElementById('upload-count').textContent = memes.length;
+  const gallery = document.getElementById('meme-gallery');
+  if (memes.length === 0) {
+    gallery.innerHTML = '<div class="empty-state" style="grid-column:1/-1;padding:20px"><p style="color:#555">No memes uploaded yet</p></div>';
+    return;
+  }
+  let html = '';
+  memes.forEach(m => {
+    html +=
+      '<div class="gallery-item">' +
+        '<img src="' + esc(m.imageUrl) + '" alt="meme">' +
+        '<button class="del-btn" onclick="deleteMeme(\'' + m.id + '\')" title="Remove">&times;</button>' +
+      '</div>';
+  });
+  gallery.innerHTML = html;
+}
+
+function updateStats() {
+  document.getElementById('stat-memes').textContent = memes.length;
+  document.getElementById('stat-votes').textContent = Math.floor(totalVotes);
+  document.getElementById('stat-rounds').textContent = roundNum;
+}
+
+// Init
+loadMemes().then(() => showView('battle'));
+</script>
+</body>
+</html>

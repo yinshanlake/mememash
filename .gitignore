@@ -1,0 +1,8 @@
+# mememash
+meme_staging/
+__pycache__/
+*.pyc
+.env
+api/local.settings.json
+node_modules/
+.venv/
