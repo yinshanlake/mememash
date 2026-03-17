@@ -1,0 +1,25 @@
+name: Daily Meme Rotation
+
+on:
+  schedule:
+    # Run daily at 08:00 UTC (16:00 Beijing time)
+    - cron: '0 8 * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  rotate:
+    runs-on: ubuntu-latest
+    name: Rotate Memes
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Run daily rotation
+        env:
+          MEMEMASH_API_URL: https://mememash-app.azurewebsites.net
+          ROTATE_COUNT: "5"
+        run: python scripts/daily_rotate.py
