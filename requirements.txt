@@ -1,0 +1,4 @@
+flask
+gunicorn
+azure-data-tables
+azure-storage-blob
